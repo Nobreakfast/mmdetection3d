@@ -336,19 +336,19 @@ def get_kitti_image_info(
             Tr_velo_to_cam = np.array(
                 [float(info) for info in lines[5].split(" ")[1:13]]
             ).reshape([3, 4])
-            Tr_imu_to_velo = np.array(
-                [float(info) for info in lines[6].split(" ")[1:13]]
-            ).reshape([3, 4])
+            # Tr_imu_to_velo = np.array(
+            #     [float(info) for info in lines[6].split(" ")[1:13]]
+            # ).reshape([3, 4])
             if extend_matrix:
                 Tr_velo_to_cam = _extend_matrix(Tr_velo_to_cam)
-                Tr_imu_to_velo = _extend_matrix(Tr_imu_to_velo)
+                # Tr_imu_to_velo = _extend_matrix(Tr_imu_to_velo)
             calib_info["P0"] = P0
             calib_info["P1"] = P1
             calib_info["P2"] = P2
             calib_info["P3"] = P3
             calib_info["R0_rect"] = rect_4x4
             calib_info["Tr_velo_to_cam"] = Tr_velo_to_cam
-            calib_info["Tr_imu_to_velo"] = Tr_imu_to_velo
+            # calib_info["Tr_imu_to_velo"] = Tr_imu_to_velo
             info["calib"] = calib_info
 
         if with_plane:
