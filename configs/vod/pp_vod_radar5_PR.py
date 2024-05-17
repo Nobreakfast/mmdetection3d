@@ -1,12 +1,12 @@
 _base_ = [
     '../_base_/models/pointpillars_hv_secfpn_kitti_hc_radar.py',
-    '../_base_/datasets/vod-3d-3class-PR.py',
+    '../_base_/datasets/vod-3d-3class-R5.py',
     '../_base_/schedules/cyclic-40e.py', '../_base_/default_runtime.py'
 ]
 
 point_cloud_range = [0, -39.68, -3, 69.12, 39.68, 1]
 # dataset settings
-data_root = 'data/vod/radar_5frames/'
+data_root = 'data/vod5f/'
 class_names = ['Pedestrian', 'Cyclist', 'Car']
 metainfo = dict(classes=class_names)
 backend_args = None
