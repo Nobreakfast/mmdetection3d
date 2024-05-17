@@ -12,19 +12,16 @@ from skimage import io
 
 def get_image_index_str(img_idx, use_prefix_id=False):
     if use_prefix_id:
-        return "{:07d}".format(img_idx)
+        return "{:06d}".format(img_idx)
     else:
-        try:
-            return "{:05d}".format(img_idx)
-        except:
-            return "{:06d}".format(img_idx)
+        return "{:05d}".format(img_idx)
 
 
 def get_kitti_info_path(
     idx,
     prefix,
     info_type="image_2",
-    file_tail=".png",
+    file_tail=".jpg",
     training=True,
     relative_path=True,
     exist_check=True,
@@ -52,7 +49,7 @@ def get_image_path(
     relative_path=True,
     exist_check=True,
     info_type="image_2",
-    file_tail=".png",
+    file_tail=".jpg",
     use_prefix_id=False,
 ):
     return get_kitti_info_path(
