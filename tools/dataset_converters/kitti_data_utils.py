@@ -15,9 +15,9 @@ def get_image_index_str(img_idx, use_prefix_id=False):
         return "{:07d}".format(img_idx)
     else:
         try:
-            return "{:06d}".format(img_idx)
-        except:
             return "{:05d}".format(img_idx)
+        except:
+            return "{:06d}".format(img_idx)
 
 
 def get_kitti_info_path(
