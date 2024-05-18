@@ -305,7 +305,7 @@ test_evaluator = val_evaluator
 # optimizer
 optim_wrapper = dict(
     type="OptimWrapper",
-    optimizer=dict(type="AdamW", lr=lr, betas=(0.95, 0.99), weight_decay=0.1),
+    optimizer=dict(type="AdamW", lr=lr, betas=(0.95, 0.99), weight_decay=0.01),
     clip_grad=dict(max_norm=35, norm_type=2),
 )
 param_scheduler = [
