@@ -29,7 +29,7 @@ anchor_sizes = [
 ]
 
 # training settings
-lr = 0.01
+lr = 0.001
 epoch_num = 80
 
 # log settings
