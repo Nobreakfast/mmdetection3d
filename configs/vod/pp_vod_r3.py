@@ -6,7 +6,7 @@ backend_args = None
 
 # dataset settings
 batch_size = 24
-num_workers = 8
+num_workers = 4
 data_root = "data/vod3f/"
 dataset_type = "KittiDataset"
 input_modality = dict(use_lidar=True, use_camera=False)
@@ -60,7 +60,7 @@ model = dict(
         point_cloud_range=point_cloud_range,
     ),
     middle_encoder=dict(
-        type="PointPillarsScatter", in_channels=64, output_shape=[496, 432]
+        type="PointPillarsScatter", in_channels=64, output_shape=[320, 320]
     ),
     backbone=dict(
         type="SECOND",
@@ -177,13 +177,6 @@ train_pipeline = [
         backend_args=backend_args,
     ),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
-    # dict(
-    #     type="ObjectNoise",
-    #     num_try=100,
-    #     translation_std=[1.0, 1.0, 0.5],
-    #     global_rot_range=[0.0, 0.0],
-    #     rot_range=[-0.78539816, 0.78539816],
-    # ),
     dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
     dict(
         type="GlobalRotScaleTrans",
