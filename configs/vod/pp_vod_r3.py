@@ -10,7 +10,7 @@ batch_size = 48
 num_workers = 4
 data_root = "data/" + data_name
 submission_prefix = data_name + "results/"
-pklfile_prefix = data_name + "pkl/""
+pklfile_prefix = data_name + "pkl/"
 dataset_type = "KittiDataset"
 input_modality = dict(use_lidar=True, use_camera=False)
 class_names = ["Pedestrian", "Cyclist", "Car"]
@@ -304,7 +304,7 @@ test_evaluator = dict(
     backend_args=backend_args,
     format_only=True,
     submission_prefix=submission_prefix,
-    pkl_prefix=pklfile_prefix,
+    pklfile_prefix=pklfile_prefix,
 )
 # optimizer
 optim_wrapper = dict(

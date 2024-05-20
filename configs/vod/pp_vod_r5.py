@@ -304,7 +304,7 @@ test_evaluator = dict(
     backend_args=backend_args,
     format_only=True,
     submission_prefix=submission_prefix,
-    pkl_prefix=pklfile_prefix,
+    pklfile_prefix=pklfile_prefix,
 )
 # optimizer
 optim_wrapper = dict(
