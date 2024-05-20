@@ -5,9 +5,11 @@ default_scope = "mmdet3d"
 backend_args = None
 
 # dataset settings
-batch_size = 24
+batch_size = 48
 num_workers = 4
 data_root = "data/vod1f/"
+submission_prefix = data_root + "results/"
+pklfile_prefix = data_root + "pkl/"
 dataset_type = "KittiDataset"
 input_modality = dict(use_lidar=True, use_camera=False)
 class_names = ["Pedestrian", "Cyclist", "Car"]
@@ -293,8 +295,16 @@ val_evaluator = dict(
     metric="bbox",
     backend_args=backend_args,
 )
-test_evaluator = val_evaluator
 
+test_evaluator = dict(
+    type="KittiMetric",
+    ann_file=data_root + "kitti_infos_val.pkl",
+    metric="bbox",
+    backend_args=backend_args,
+    format_only=True,
+    submission_prefix=submission_prefix,
+    pkl_prefix=pklfile_prefix,
+)
 # optimizer
 optim_wrapper = dict(
     type="OptimWrapper",

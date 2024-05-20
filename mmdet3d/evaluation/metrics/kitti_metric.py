@@ -403,7 +403,7 @@ class KittiMetric(BaseMetric):
                 }
 
             if submission_prefix is not None:
-                curr_file = f'{submission_prefix}/{sample_idx:06d}.txt'
+                curr_file = f'{submission_prefix}/{sample_idx:05d}.txt'
                 with open(curr_file, 'w') as f:
                     bbox = anno['bbox']
                     loc = anno['location']

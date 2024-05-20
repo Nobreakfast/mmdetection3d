@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument(
         '--wait-time', type=float, default=2, help='the interval of show (s)')
     parser.add_argument(
-        '--cfg-options',
+        '--cfg-options', # --cfg-options "test_evaluator.pklfile_prefix=./test"
         nargs='+',
         action=DictAction,
         help='override some settings in the used config, the key-value pair '
