@@ -5,7 +5,21 @@ default_scope = "mmdet3d"
 backend_args = None
 
 # prune settings
-ratio = 0.4
+p_pruner = "OneShot"
+p_verbose = False
+p_others = {
+    "grapher": "backward",
+    "grouper": "add",
+    "algorithm": "uniform",
+    "score": "l1",
+    "ratio": 0.5,
+    "ignore_modules": {
+        "middle_encoder": None,
+        "voxel_encoder": None,
+    }
+}
+p_num_gt_instance = 2
+p_points_feat_dim = 7
 
 # dataset settings
 data_name = "vod5f/"
