@@ -152,7 +152,8 @@ def main():
     if args.load_prune_pt is None:
         print("[UNIP] No .pt file to load. Trying to prune the model (which may cause error in [Load .pth])")
         model = runner.model
-        data = utils.get_example_data(model, num_gt_instance=2, points_feat_dim=7)
+        data = utils.get_example_data(model, num_gt_instance=cfg.p_num_gt_instance, points_feat_dim=cfg.p_points_feat_dim)
+
         pruner = unip.prune(
             cfg.p_pruner, model, data, verbose=cfg.p_verbose, **cfg.p_others
         )

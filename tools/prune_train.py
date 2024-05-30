@@ -151,11 +151,8 @@ def main():
     if args.load_prune_pt is None:
         print("[UNIP] no .pt file to load, start Pruning model")
         model = runner.model
-        data = utils.get_example_data(model, num_gt_instance=2, points_feat_dim=7)
-        ignore_modules = {
-            model.middle_encoder: None,
-            model.voxel_encoder: None,
-        }
+        data = utils.get_example_data(model, num_gt_instance=cfg.p_num_gt_instance, points_feat_dim=cfg.p_points_feat_dim)
+
         pruner = unip.prune(
             cfg.p_pruner, model, data, verbose=cfg.p_verbose, **cfg.p_others
         )
