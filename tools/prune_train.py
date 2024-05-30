@@ -4,6 +4,7 @@ import logging
 import os
 import os.path as osp
 
+import torch
 from mmengine.config import Config, DictAction
 from mmengine.logging import print_log
 from mmengine.registry import RUNNERS
@@ -21,6 +22,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a 3D detector')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument("--load_prune_pt", help="load pruned model", default=None)
     parser.add_argument(
         '--amp',
         action='store_true',
@@ -142,24 +144,27 @@ def main():
         # if 'runner_type' is set in the cfg
         runner = RUNNERS.build(cfg)
 
+    if cfg.load_prune_pt is None:
+        DefaultScope.get_instance("prune", scope_name="mmdet3d")
+        model = runner.model
+        ignore_modules = {
+            model.middle_encoder: None,
+            model.voxel_encoder: None,
+        }
+        num_gt_instance = 2
+        packed_inputs = create_detector_inputs(
+            num_gt_instance=num_gt_instance, points_feat_dim=7
+        )
+        data = model.data_preprocessor(packed_inputs, True)
+        pruner = unip.prune(
+            "OneShot", model, data, ratio=0.5, verbose=False, ignore_modules=ignore_modules
+        )
+        pruner.prune()
+        # output = model(**data)
+        model.zero_grad()
+    else:
+        runner.model = torch.load(cfg.load_prune_pt)
 
-    DefaultScope.get_instance("prune", scope_name="mmdet3d")
-    model = runner.model
-    ignore_modules = {
-        model.middle_encoder: None,
-        model.voxel_encoder: None,
-    }
-    num_gt_instance = 2
-    packed_inputs = create_detector_inputs(
-        num_gt_instance=num_gt_instance, points_feat_dim=7
-    )
-    data = model.data_preprocessor(packed_inputs, True)
-    pruner = unip.prune(
-        "OneShot", model, data, ratio=0.5, verbose=True, ignore_modules=ignore_modules
-    )
-    pruner.prune()
-    output = model(**data)
-    model.zero_grad()
     # start training
     runner.train()
 
