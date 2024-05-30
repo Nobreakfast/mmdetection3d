@@ -13,6 +13,10 @@ from mmdet3d.utils import replace_ceph_backend
 from mmdet3d.testing import create_detector_inputs, get_detector_cfg, setup_seed
 
 import unip
+from unip.utils.evaluation import cal_flops
+from unip.utils.data_type import DEVICE
+
+import utils
 
 
 # TODO: support fuse_conv_bn and format_only
@@ -125,8 +129,6 @@ def main():
         cfg.work_dir = osp.join('./work_dirs',
                                 osp.splitext(osp.basename(args.config))[0])
 
-    # cfg.load_from = args.checkpoint
-
     if args.show or args.show_dir:
         cfg = trigger_visualization_hook(cfg, args)
 
@@ -148,38 +150,37 @@ def main():
         runner = RUNNERS.build(cfg)
 
     if args.load_prune_pt is None:
-        print("[Load .pt] No pt file to load. Trying to prune the model (which may cause error in [Load .pth])")
-        DefaultScope.get_instance("prune", scope_name="mmdet3d")
+        print("[UNIP] No .pt file to load. Trying to prune the model (which may cause error in [Load .pth])")
         model = runner.model
-        ignore_modules = {
-            model.middle_encoder: None,
-            model.voxel_encoder: None,
-        }
-        num_gt_instance = 2
-        packed_inputs = create_detector_inputs(
-            num_gt_instance=num_gt_instance, points_feat_dim=7
-        )
-        data = model.data_preprocessor(packed_inputs, True)
+        data = utils.get_example_data(model, num_gt_instance=2, points_feat_dim=7)
         pruner = unip.prune(
-            "OneShot", model, data, ratio=0.5, verbose=False, ignore_modules=ignore_modules
+            cfg.p_pruner, model, data, verbose=cfg.p_verbose, **cfg.p_others
         )
         pruner.prune()
         # output = model(**data)
         model.zero_grad()
     else:
-        print("[Load .pt] Load pt file from", cfg.load_prune_pt)
-        runner.model = torch.load(cfg.load_prune_pt)
-
+        print("[UNIP] Load .pt file from", args.load_prune_pt)
+        runner.model = torch.load(args.load_prune_pt)
     if args.load_prune_pth is not None:
-        print("[Load .pth] Load pth file from", cfg.load_pth)
-        runner._load_from = cfg.load_pth
+        print("[UNIP] Load .pth file from", args.load_pth)
+        runner._load_from = args.load_pth
         runner.load_or_resume()
     else:
-        print("[Load .pth] No pth file to load")
+        print("[UNIP] No .pth file to load")
+
+    data = utils.get_example_data(runner.model, num_gt_instance=2, points_feat_dim=7)
+    flops, params, clever_print = cal_flops(runner.model, data, DEVICE)
+    print(f"Pruned: {clever_print}")
+
 
     # start testing
     runner.test()
 
+    # save model
+    # save_path = f"work_dirs/{args.config.split('/')[-1].split('.')[0]}/pruned_last.pt"
+    # os.system(f"mkdir -p {osp.dirname(save_path)}")
+    # torch.save(runner.model, save_path)
 
 if __name__ == '__main__':
     main()

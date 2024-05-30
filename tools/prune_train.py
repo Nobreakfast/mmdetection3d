@@ -12,16 +12,20 @@ from mmengine.runner import Runner
 from mmengine import DefaultScope
 
 import unip
+from unip.utils.evaluation import cal_flops
+from unip.utils.data_type import DEVICE
 
 from mmdet3d.utils import replace_ceph_backend
 from mmdet3d.testing import create_detector_inputs, get_detector_cfg, setup_seed
 from mmdet3d.models.middle_encoders import PointPillarsScatter
+import utils
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a 3D detector')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument("--checkpoint", help="checkpoint file", default=None)
     parser.add_argument("--load_prune_pt", help="load pruned model", default=None)
     parser.add_argument(
         '--amp',
@@ -144,30 +148,38 @@ def main():
         # if 'runner_type' is set in the cfg
         runner = RUNNERS.build(cfg)
 
-    if cfg.load_prune_pt is None:
-        DefaultScope.get_instance("prune", scope_name="mmdet3d")
+    if args.load_prune_pt is None:
+        print("[UNIP] no .pt file to load, start Pruning model")
         model = runner.model
+        data = utils.get_example_data(model, num_gt_instance=2, points_feat_dim=7)
         ignore_modules = {
             model.middle_encoder: None,
             model.voxel_encoder: None,
         }
-        num_gt_instance = 2
-        packed_inputs = create_detector_inputs(
-            num_gt_instance=num_gt_instance, points_feat_dim=7
-        )
-        data = model.data_preprocessor(packed_inputs, True)
         pruner = unip.prune(
-            "OneShot", model, data, ratio=0.5, verbose=False, ignore_modules=ignore_modules
+            cfg.p_pruner, model, data, verbose=cfg.p_verbose, **cfg.p_others
         )
+        flops, params, clever_print = cal_flops(model, data, DEVICE)
+        print(f"Original: {clever_print}")
         pruner.prune()
-        # output = model(**data)
+        flops, params, clever_print = cal_flops(model, data, DEVICE)
+        print(f"pruned: {clever_print}")
         model.zero_grad()
     else:
-        runner.model = torch.load(cfg.load_prune_pt)
+        print("[UNIP] load .pt pruned model from", args.load_prune_pt)
+        runner.model = torch.load(args.load_prune_pt)
+
+    data = utils.get_example_data(runner.model, num_gt_instance=2, points_feat_dim=7)
+    flops, params, clever_print = cal_flops(runner.model, data, DEVICE)
+    print(f"Pruned: {clever_print}")
 
     # start training
     runner.train()
 
+    # save model
+    save_path = f"work_dirs/{args.config.split('/')[-1].split('.')[0]}/pruned_last.pt"
+    os.system(f"mkdir -p {osp.dirname(save_path)}")
+    torch.save(runner.model, save_path)
 
 if __name__ == '__main__':
     main()
