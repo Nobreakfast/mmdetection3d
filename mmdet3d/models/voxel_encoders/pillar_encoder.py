@@ -324,3 +324,164 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
                 features = torch.cat([point_feats, feat_per_point], dim=1)
 
         return voxel_feats, voxel_coors
+
+@MODELS.register_module()
+class Radar7PillarFeatureNet(nn.Module):
+    def __init__(self,
+                 in_channels: Optional[int] = 4,
+                 feat_channels: Optional[tuple] = (64, ),
+                 with_distance: Optional[bool] = False,
+                 with_cluster_center: Optional[bool] = True,
+                 with_voxel_center: Optional[bool] = True,
+                 voxel_size: Optional[Tuple[float]] = (0.2, 0.2, 4),
+                 point_cloud_range: Optional[Tuple[float]] = (0, -40, -3, 70.4,
+                                                              40, 1),
+                 norm_cfg: Optional[dict] = dict(
+                     type='BN1d', eps=1e-3, momentum=0.01),
+                 mode: Optional[str] = 'max',
+                 legacy: Optional[bool] = True,
+                 use_xyz: Optional[bool] = True,
+                 use_rcs: Optional[bool] = True,
+                 use_vr: Optional[bool] = True,
+                 use_vr_comp: Optional[bool] = True,
+                 use_time: Optional[bool] = True,
+                 use_elevation: Optional[bool] = True,
+                 ):
+        super(Radar7PillarFeatureNet, self).__init__()
+
+        self.use_xyz = use_xyz
+        self.use_rcs = use_rcs
+        self.use_vr = use_vr
+        self.use_vr_comp = use_vr_comp
+        self.use_time = use_time
+        self.use_elevation = use_elevation
+
+        assert len(feat_channels) > 0
+        # self.legacy = legacy
+        self.legacy = False
+        in_channels = 0
+        self.selected_indexes = []
+        available_features = ['x', 'y', 'z', 'rcs', 'v_r', 'v_r_comp', 'time']
+        in_channels += 6 # center_x, center_y, center_z, mean_x, mean_y, mean_z, time, we need 6 new
+        self.x_ind = available_features.index('x')
+        self.y_ind = available_features.index('y')
+        self.z_ind = available_features.index('z')
+        self.rcs_ind = available_features.index('rcs')
+        self.vr_ind = available_features.index('v_r')
+        self.vr_comp_ind = available_features.index('v_r_comp')
+        self.time_ind = available_features.index('time')
+
+        if self.use_xyz:  # if x y z coordinates are used, add 3 channels and save the indexes
+            in_channels += 3  # x, y, z
+            self.selected_indexes.extend((self.x_ind, self.y_ind, self.z_ind))  # adding x y z channels to the indexes
+
+        if self.use_rcs:  # add 1 if RCS is used and save the indexes
+            in_channels += 1
+            self.selected_indexes.append(self.rcs_ind)  # adding  RCS channels to the indexes
+
+        if self.use_vr:  # add 1 if vr is used and save the indexes. Note, we use compensated vr!
+            in_channels += 1
+            self.selected_indexes.append(self.vr_ind)  # adding  v_r_comp channels to the indexes
+
+        if self.use_vr_comp:  # add 1 if vr is used (as proxy for sensor cue) and save the indexes
+            in_channels += 1
+            self.selected_indexes.append(self.vr_comp_ind)
+
+        if self.use_time:  # add 1 if time is used and save the indexes
+            in_channels += 1
+            self.selected_indexes.append(self.time_ind)  # adding  time channel to the indexes
+        
+        self.selected_indexes = torch.LongTensor(self.selected_indexes)
+        self._with_voxel_center = with_voxel_center
+        self._with_distance = with_distance
+
+        self.in_channels = in_channels
+        feat_channels = [in_channels] + list(feat_channels)
+        pfn_layers = []
+        for i in range(len(feat_channels) - 1):
+            in_filters = feat_channels[i]
+            out_filters = feat_channels[i + 1]
+            if i < len(feat_channels) - 2:
+                last_layer = False
+            else:
+                last_layer = True
+            pfn_layers.append(
+                PFNLayer(
+                    in_filters,
+                    out_filters,
+                    norm_cfg=norm_cfg,
+                    last_layer=last_layer,
+                    mode=mode))
+        self.pfn_layers = nn.ModuleList(pfn_layers)
+
+        # Need pillar (voxel) size and x/y offset in order to calculate offset
+        self.vx = voxel_size[0]
+        self.vy = voxel_size[1]
+        self.vz = voxel_size[2]
+        self.x_offset = self.vx / 2 + point_cloud_range[0]
+        self.y_offset = self.vy / 2 + point_cloud_range[1]
+        self.z_offset = self.vz / 2 + point_cloud_range[2]
+        self.point_cloud_range = point_cloud_range
+
+        ### LOGGING USED FEATURES ###
+        print("number of point features used: " + str(in_channels))
+        print("6 of these are 2 * (x y z)  coordinates realtive to mean and center of pillars")
+        print(str(len(self.selected_indexes)) + " are selected original features: ")
+
+        for k in self.selected_indexes:
+            print(str(k) + ": " + available_features[k])
+
+    def forward(self, features: Tensor, num_points: Tensor, coors: Tensor,
+                *args, **kwargs) -> Tensor:
+        if not self.use_elevation:  # if we ignore elevation (z) and v_z
+            features[:, :, self.z_ind] = 0  # set z to zero before doing anything
+        # features_ls = [features]
+        
+        points_mean = features[:, :, :self.z_ind + 1].sum(
+            dim=1, keepdim=True) / num_points.type_as(features).view(
+                -1, 1, 1)
+        f_cluster = features[:, :, :3] - points_mean
+        # features_ls.append(f_cluster)
+
+
+        # Find distance of x, y, and z from pillar center
+        dtype = features.dtype
+        if self._with_voxel_center: #need to be True
+            if not self.legacy: #self.legacy must = False
+                f_center = torch.zeros_like(features[:, :, :3])
+                f_center[:, :, 0] = features[:, :, 0] - (
+                    coors[:, 3].to(dtype).unsqueeze(1) * self.vx +
+                    self.x_offset)
+                f_center[:, :, 1] = features[:, :, 1] - (
+                    coors[:, 2].to(dtype).unsqueeze(1) * self.vy +
+                    self.y_offset)
+                f_center[:, :, 2] = features[:, :, 2] - (
+                    coors[:, 1].to(dtype).unsqueeze(1) * self.vz +
+                    self.z_offset)
+            else:
+                raise ValueError("legacy must be False")
+        else:
+            raise ValueError("_with_voxel_center must be True")
+        # features_ls.append(f_center)
+
+        features = features[:, :, self.selected_indexes] # filtering for used feature #in test: (166, 10, 7) , but in train: (2641, 10, 7)
+        features_ls = [features, f_cluster, f_center]
+
+        if self._with_distance:
+            points_dist = torch.norm(features[:, :, :3], 2, 2, keepdim=True)
+            features_ls.append(points_dist)
+
+        # Combine together feature decorations
+        features = torch.cat(features_ls, dim=-1) #(num of non-empty pillars, 10, 13)
+        # The feature decorations were calculated without regard to whether
+        # pillar was empty. Need to ensure that
+        # empty pillars remain set to zeros.
+        voxel_count = features.shape[1]
+        mask = get_paddings_indicator(num_points, voxel_count, axis=0)
+        mask = torch.unsqueeze(mask, -1).type_as(features)
+        features *= mask
+
+        for pfn in self.pfn_layers:
+            features = pfn(features, num_points)
+
+        return features.squeeze(1)

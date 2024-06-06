@@ -164,8 +164,8 @@ def main():
         print("[UNIP] Load .pt file from", args.load_prune_pt)
         runner.model = torch.load(args.load_prune_pt)
     if args.load_prune_pth is not None:
-        print("[UNIP] Load .pth file from", args.load_pth)
-        runner._load_from = args.load_pth
+        print("[UNIP] Load .pth file from", args.load_prune_pth)
+        runner._load_from = args.load_prune_pth
         runner.load_or_resume()
     else:
         print("[UNIP] No .pth file to load")

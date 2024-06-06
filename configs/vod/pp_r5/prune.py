@@ -4,19 +4,40 @@ global settings
 default_scope = "mmdet3d"
 backend_args = None
 
-# dataset settings
-data_name = "vod1f/"
+# prune settings
+p_pruner = "OneShot"
+p_verbose = False
+p_others = {
+    "grapher": "backward",
+    "grouper": "add",
+    "algorithm": "uniform",
+    "score": "l1",
+    "ratio": 0.5,
+    "ignore_modules": {
+        "middle_encoder": None,
+        "voxel_encoder": None,
+    },
+}
+p_num_gt_instance = 2
+p_points_feat_dim = 7
+
+# Important settings
 batch_size = 48
 num_workers = 4
-data_root = "data/" + data_name
-submission_prefix = "work_dirs/" + data_name + "results/"
-pklfile_prefix = "work_dirs/" + data_name + "pkl/"
+data_root = "data/vod5f/"
+work_dirs = "work_dirs/vod_pp_r5/prune/"
+submission_prefix = work_dirs + "results/"
+pklfile_prefix = work_dirs + "pkl/"
+optim_type = "AdamW"
+
+# dataset settings
 dataset_type = "KittiDataset"
 input_modality = dict(use_lidar=True, use_camera=False)
 class_names = ["Pedestrian", "Cyclist", "Car"]
 metainfo = dict(classes=class_names)
 voxel_size = [0.16, 0.16, 5]
 point_cloud_range = [0, -25.6, -3, 51.2, 25.6, 2]
+output_shape = [320, 320]
 
 # model settings
 max_num_points = 10
@@ -63,7 +84,7 @@ model = dict(
         point_cloud_range=point_cloud_range,
     ),
     middle_encoder=dict(
-        type="PointPillarsScatter", in_channels=64, output_shape=[320, 320]
+        type="PointPillarsScatter", in_channels=64, output_shape=output_shape
     ),
     backbone=dict(
         type="SECOND",
@@ -253,8 +274,8 @@ train_dataloader = dict(
     ),
 )
 val_dataloader = dict(
-    batch_size=1,
-    num_workers=1,
+    batch_size=batch_size * 4,
+    num_workers=num_workers,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type="DefaultSampler", shuffle=False),
@@ -272,8 +293,8 @@ val_dataloader = dict(
     ),
 )
 test_dataloader = dict(
-    batch_size=1,
-    num_workers=1,
+    batch_size=batch_size * 4,
+    num_workers=num_workers,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type="DefaultSampler", shuffle=False),
@@ -309,7 +330,7 @@ test_evaluator = dict(
 # optimizer
 optim_wrapper = dict(
     type="OptimWrapper",
-    optimizer=dict(type="AdamW", lr=lr, betas=(0.95, 0.99), weight_decay=0.01),
+    optimizer=dict(type=optim_type, lr=lr, betas=(0.95, 0.99), weight_decay=0.01),
     clip_grad=dict(max_norm=35, norm_type=2),
 )
 param_scheduler = [

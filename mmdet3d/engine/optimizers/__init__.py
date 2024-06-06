@@ -1,1 +1,1 @@
-from .unip_optim import UniPSGD, UniPAdamW
+from .unip_optim import UniPSGD, UniPAdamW, UniPAdam
