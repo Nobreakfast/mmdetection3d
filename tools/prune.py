@@ -56,7 +56,7 @@ def main():
         points_feat_dim=cfg.p_points_feat_dim,
     )
 
-    flops, params, clever_print = cal_flops(model, data, DEVICE)
+    flops, params, clever_print = cal_flops(model, data)
     print(f"Original: {clever_print}")
 
     pruner = unip.prune(
@@ -65,7 +65,7 @@ def main():
     # pruner.plot(group=False, save_path=f"work_dirs/fig/{time.time()}")
     pruner.prune()
 
-    flops, params, clever_print = cal_flops(model, data, DEVICE)
+    flops, params, clever_print = cal_flops(model, data)
     print(f"Pruned: {clever_print}")
 
     # save model

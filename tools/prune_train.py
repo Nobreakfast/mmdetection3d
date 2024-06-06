@@ -172,7 +172,7 @@ def main():
         pruner = unip.prune(
             cfg.p_pruner, model, data, verbose=cfg.p_verbose, **cfg.p_others
         )
-        flops, params, clever_print = cal_flops(model, data, DEVICE)
+        flops, params, clever_print = cal_flops(model, data)
         print(f"Original: {clever_print}")
         pruner.prune()
     else:
@@ -180,7 +180,7 @@ def main():
         runner.model = torch.load(args.load_prune_pt)
 
     data = utils.get_example_data(runner.model, num_gt_instance=2, points_feat_dim=7)
-    flops, params, clever_print = cal_flops(runner.model, data, DEVICE)
+    flops, params, clever_print = cal_flops(runner.model, data)
     print(f"Pruned: {clever_print}")
 
     # start training
