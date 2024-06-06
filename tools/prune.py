@@ -9,6 +9,7 @@ from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
 
 import torch
+
 from mmengine import DefaultScope
 
 from mmdet3d.registry import MODELS
@@ -37,10 +38,11 @@ def main():
     args = parse_args()
     # load config
     cfg = Config.fromfile(args.config)
+    DefaultScope.get_instance("prune", scope_name="mmdet3d")
 
     if args.checkpoint is not None:
         print("[UNIP] Load checkpoint from", args.checkpoint)
-        cfg.load_from = args.checkpoint
+        cfg.model.load_from = args.checkpoint
     model = MODELS.build(cfg.model)
 
     data = utils.get_example_data(
