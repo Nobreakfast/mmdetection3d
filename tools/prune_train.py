@@ -175,9 +175,6 @@ def main():
         flops, params, clever_print = cal_flops(model, data, DEVICE)
         print(f"Original: {clever_print}")
         pruner.prune()
-        flops, params, clever_print = cal_flops(model, data, DEVICE)
-        print(f"pruned: {clever_print}")
-        model.zero_grad()
     else:
         print("[UNIP] load .pt pruned model from", args.load_prune_pt)
         runner.model = torch.load(args.load_prune_pt)
