@@ -8,12 +8,12 @@ custom_imports = dict(
 )
 
 # Important settings
-batch_size = 48
+batch_size = 24
 num_workers = 4
 data_root = "data/vod5f/"
-work_dirs = "work_dirs/vod_pp_r5/sparse_train/"
-submission_prefix = work_dirs + "results/"
-pklfile_prefix = work_dirs + "pkl/"
+work_dir = "work_dirs/vod_pp_r5/sparse_train/"
+submission_prefix = work_dir + "results/"
+pklfile_prefix = work_dir + "pkl/"
 optim_type = "UniPAdamW"
 
 # dataset settings
@@ -260,7 +260,7 @@ train_dataloader = dict(
     ),
 )
 val_dataloader = dict(
-    batch_size=batch_size * 4,
+    batch_size=batch_size,
     num_workers=num_workers,
     persistent_workers=True,
     drop_last=False,
@@ -279,7 +279,7 @@ val_dataloader = dict(
     ),
 )
 test_dataloader = dict(
-    batch_size=batch_size * 4,
+    batch_size=batch_size,
     num_workers=num_workers,
     persistent_workers=True,
     drop_last=False,
