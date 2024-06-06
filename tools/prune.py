@@ -42,8 +42,13 @@ def main():
 
     if args.checkpoint is not None:
         print("[UNIP] Load checkpoint from", args.checkpoint)
-        cfg.model.load_from = args.checkpoint
+        cfg.load_from = args.checkpoint
     model = MODELS.build(cfg.model)
+    pth = torch.load(cfg.load_from)
+    if "state_dict" in pth:
+        model.load_state_dict(pth["state_dict"])
+    else:
+        model.load_state_dict(pth)
 
     data = utils.get_example_data(
         model,
