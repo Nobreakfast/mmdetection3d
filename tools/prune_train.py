@@ -151,6 +151,7 @@ def main():
         cfg.resume = True
         cfg.load_from = args.resume
 
+
     # build the runner from config
     if "runner_type" not in cfg:
         # build the default runner
@@ -159,6 +160,10 @@ def main():
         # build customized runner from the registry
         # if 'runner_type' is set in the cfg
         runner = RUNNERS.build(cfg)
+
+    if args.checkpoint is not None:
+        runner._load_from = args.checkpoint
+        runner.load_or_resume()
 
     if args.load_prune_pt is None:
         print("[UNIP] no .pt file to load, start Pruning model")
@@ -175,6 +180,9 @@ def main():
         flops, params, clever_print = cal_flops(model, data)
         print(f"Original: {clever_print}")
         pruner.prune()
+        save_path = cfg.work_dir + "pruned_model.pt"
+        os.system(f"mkdir -p {osp.dirname(save_path)}")
+        torch.save(runner.model, save_path)
     else:
         print("[UNIP] load .pt pruned model from", args.load_prune_pt)
         runner.model = torch.load(args.load_prune_pt)
