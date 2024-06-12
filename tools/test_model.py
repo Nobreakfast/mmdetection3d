@@ -17,7 +17,9 @@ import mmdet3d.models
 from mmdet3d.utils import replace_ceph_backend
 
 import unip
+from unip.utils.evaluation import cal_flops
 
+import utils
 
 # TODO: support fuse_conv_bn and format_only
 def parse_args():
@@ -34,8 +36,15 @@ def main():
 
     DefaultScope.get_instance("prune", scope_name="mmdet3d")
     model = MODELS.build(cfg.model)
-    print(model)
+    data = utils.get_example_data(
+        model,
+        num_gt_instance=cfg.p_num_gt_instance,
+        points_feat_dim=cfg.p_points_feat_dim,
+    )
 
+    flops, params, clever_print = cal_flops(model, data)
+    # print(model)
+    print(f"Original: {clever_print}")
 
 if __name__ == "__main__":
     main()
