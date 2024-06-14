@@ -17,9 +17,10 @@ import mmdet3d.models
 from mmdet3d.utils import replace_ceph_backend
 
 import unip
-from unip.utils.evaluation import cal_flops
+from unip.utils.evaluation import cal_flops, to_device, process_data
 
 import utils
+
 
 # TODO: support fuse_conv_bn and format_only
 def parse_args():
@@ -40,11 +41,17 @@ def main():
         model,
         num_gt_instance=cfg.p_num_gt_instance,
         points_feat_dim=cfg.p_points_feat_dim,
+        img_size=cfg.image_size if hasattr(cfg, "image_size") else (256, 256),
     )
 
     flops, params, clever_print = cal_flops(model, data)
     # print(model)
     print(f"Original: {clever_print}")
+    model = to_device(model)
+    data = process_data(data)
+
+    model.loss(*data)
+
 
 if __name__ == "__main__":
     main()

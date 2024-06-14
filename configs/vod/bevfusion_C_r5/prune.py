@@ -29,7 +29,7 @@ p_points_feat_dim = 7
 batch_size = 2
 num_workers = 4
 data_root = "data/vod5f/"
-work_dir = "work_dirs/vod_bevfusion_r5/prune/"
+work_dir = "work_dirs/vod_bevfusion_C_r5/prune/"
 submission_prefix = work_dir + "results/"
 pklfile_prefix = work_dir + "pkl/"
 optim_type = "AdamW"
@@ -71,7 +71,7 @@ checkpoint_num = 1
 # model
 model = dict(
     type="FusionDetector",
-    modality=input_modality,
+    modality=dict(use_lidar=False, use_camera=True),
     data_preprocessor=dict(
         type="Det3DDataPreprocessor",
         voxel=True,
@@ -149,7 +149,7 @@ model = dict(
         dbound=[1.0, 60.0, 1.0],
         downsample=1,
     ),
-    fusion_layer=dict(type="ConvFuser", in_channels=[64, 64], out_channels=64),
+    # fusion_layer=dict(type="ConvFuser", in_channels=[64, 64], out_channels=64),
     bbox_head=dict(
         type="Anchor3DHead",
         num_classes=3,
@@ -254,14 +254,14 @@ train_pipeline = [
     dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
     # dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
-    dict(
-        type="GlobalRotScaleTrans",
-        rot_range=[-0.78539816, 0.78539816],
-        scale_ratio_range=[0.95, 1.05],
-    ),
-    dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
-    dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
-    dict(type="PointShuffle"),
+    # dict(
+    #     type="GlobalRotScaleTrans",
+    #     rot_range=[-0.78539816, 0.78539816],
+    #     scale_ratio_range=[0.95, 1.05],
+    # ),
+    # dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    # dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
+    # dict(type="PointShuffle"),
     dict(
         type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
     ),
@@ -275,22 +275,22 @@ test_pipeline = [
         backend_args=backend_args,
     ),
     dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
-    dict(
-        type="MultiScaleFlipAug3D",
-        img_scale=(1333, 800),
-        pts_scale_ratio=1,
-        flip=False,
-        transforms=[
-            dict(
-                type="GlobalRotScaleTrans",
-                rot_range=[0, 0],
-                scale_ratio_range=[1.0, 1.0],
-                translation_std=[0, 0, 0],
-            ),
-            dict(type="RandomFlip3D"),
-            dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
-        ],
-    ),
+    # dict(
+    #     type="MultiScaleFlipAug3D",
+    #     img_scale=(1333, 800),
+    #     pts_scale_ratio=1,
+    #     flip=False,
+    #     transforms=[
+    #         dict(
+    #             type="GlobalRotScaleTrans",
+    #             rot_range=[0, 0],
+    #             scale_ratio_range=[1.0, 1.0],
+    #             translation_std=[0, 0, 0],
+    #         ),
+    #         dict(type="RandomFlip3D"),
+    #         dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    #     ],
+    # ),
     dict(
         type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
     ),

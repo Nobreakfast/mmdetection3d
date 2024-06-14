@@ -29,14 +29,14 @@ p_points_feat_dim = 7
 batch_size = 2
 num_workers = 4
 data_root = "data/vod5f/"
-work_dir = "work_dirs/vod_bevfusion_r5/prune/"
+work_dir = "work_dirs/vod_bevfusion_R_r5/prune/"
 submission_prefix = work_dir + "results/"
 pklfile_prefix = work_dir + "pkl/"
 optim_type = "AdamW"
 
 # dataset settings
 dataset_type = "KittiDataset"
-input_modality = dict(use_lidar=True, use_camera=True)
+input_modality = dict(use_lidar=True, use_camera=False)
 class_names = ["Pedestrian", "Cyclist", "Car"]
 metainfo = dict(classes=class_names)
 voxel_size = [0.16, 0.16, 5]
@@ -149,7 +149,7 @@ model = dict(
         dbound=[1.0, 60.0, 1.0],
         downsample=1,
     ),
-    fusion_layer=dict(type="ConvFuser", in_channels=[64, 64], out_channels=64),
+    # fusion_layer=dict(type="ConvFuser", in_channels=[64, 64], out_channels=64),
     bbox_head=dict(
         type="Anchor3DHead",
         num_classes=3,
@@ -251,7 +251,7 @@ train_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    # dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
     # dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
     dict(
@@ -274,7 +274,7 @@ test_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    # dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
     dict(
         type="MultiScaleFlipAug3D",
         img_scale=(1333, 800),
@@ -303,7 +303,7 @@ eval_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    # dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
     dict(
         type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
     ),

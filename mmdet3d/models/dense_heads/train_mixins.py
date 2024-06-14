@@ -307,6 +307,8 @@ class AnchorTrainMixin(object):
             if gt_instance_3d.labels_3d is None:
                 labels[pos_inds] = 1
             else:
+                # print(labels.device, pos_inds.device, sampling_result.pos_assigned_gt_inds.device, gt_instance_3d.labels_3d.device)
+                gt_instance_3d.labels_3d = gt_instance_3d.labels_3d.to(labels.device)
                 labels[pos_inds] = gt_instance_3d.labels_3d[
                     sampling_result.pos_assigned_gt_inds]
             if self.train_cfg.pos_weight <= 0:

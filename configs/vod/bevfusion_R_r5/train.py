@@ -1,49 +1,26 @@
 """
 global settings
 """
-
 default_scope = "mmdet3d"
 backend_args = None
-custom_imports = dict(
-    imports=["projects.BEVFusion.bevfusion"], allow_failed_imports=False
-)
-
-# prune settings
-p_pruner = "OneShot"
-p_verbose = False
-p_others = {
-    "grapher": "backward",
-    "grouper": "add",
-    "algorithm": "uniform",
-    "score": "l1",
-    "ratio": 0.5,
-    "ignore_modules": {
-        "middle_encoder": None,
-        "voxel_encoder": None,
-    },
-}
-p_num_gt_instance = 2
-p_points_feat_dim = 7
 
 # Important settings
-batch_size = 2
+batch_size = 24
 num_workers = 4
 data_root = "data/vod5f/"
-work_dir = "work_dirs/vod_bevfusion_r5/prune/"
+work_dir = "work_dirs/vod_pp_r5/train/"
 submission_prefix = work_dir + "results/"
 pklfile_prefix = work_dir + "pkl/"
 optim_type = "AdamW"
 
 # dataset settings
 dataset_type = "KittiDataset"
-input_modality = dict(use_lidar=True, use_camera=True)
+input_modality = dict(use_lidar=True, use_camera=False)
 class_names = ["Pedestrian", "Cyclist", "Car"]
 metainfo = dict(classes=class_names)
 voxel_size = [0.16, 0.16, 5]
 point_cloud_range = [0, -25.6, -3, 51.2, 25.6, 2]
 output_shape = [320, 320]
-image_size = [1936, 1216]
-image_size = [1216, 1936]
 
 # model settings
 max_num_points = 10
@@ -70,8 +47,7 @@ checkpoint_num = 1
 
 # model
 model = dict(
-    type="FusionDetector",
-    modality=input_modality,
+    type="VoxelNet",
     data_preprocessor=dict(
         type="Det3DDataPreprocessor",
         voxel=True,
@@ -82,7 +58,7 @@ model = dict(
             max_voxels=(16000, 40000),
         ),
     ),
-    pts_voxel_encoder=dict(
+    voxel_encoder=dict(
         type="PillarFeatureNet",
         in_channels=7,
         feat_channels=[64],
@@ -90,66 +66,22 @@ model = dict(
         voxel_size=voxel_size,
         point_cloud_range=point_cloud_range,
     ),
-    pts_middle_encoder=dict(
+    middle_encoder=dict(
         type="PointPillarsScatter", in_channels=64, output_shape=output_shape
     ),
-    pts_backbone=dict(
+    backbone=dict(
         type="SECOND",
         in_channels=64,
         layer_nums=[3, 5, 5],
         layer_strides=[2, 2, 2],
         out_channels=[64, 128, 256],
     ),
-    pts_neck=dict(
+    neck=dict(
         type="SECONDFPN",
         in_channels=[64, 128, 256],
         upsample_strides=[1, 2, 4],
         out_channels=[128, 128, 128],
     ),
-    img_backbone=dict(
-        type="mmdet.SwinTransformer",
-        embed_dims=96,
-        depths=[2, 2, 6, 2],
-        num_heads=[3, 6, 12, 24],
-        window_size=7,
-        mlp_ratio=4,
-        qkv_bias=True,
-        qk_scale=None,
-        drop_rate=0.0,
-        attn_drop_rate=0.0,
-        drop_path_rate=0.2,
-        patch_norm=True,
-        out_indices=[1, 2, 3],
-        with_cp=False,
-        convert_weights=True,
-        init_cfg=dict(
-            type="Pretrained",
-            checkpoint="https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth",  # noqa: E251  # noqa: E501
-        ),
-    ),
-    img_neck=dict(
-        type="GeneralizedLSSFPN",
-        in_channels=[192, 384, 768],
-        out_channels=256,
-        start_level=0,
-        num_outs=3,
-        norm_cfg=dict(type="BN2d", requires_grad=True),
-        act_cfg=dict(type="ReLU", inplace=True),
-        upsample_cfg=dict(mode="bilinear", align_corners=False),
-    ),
-    view_transform=dict(
-        type="DepthLSSTransform",
-        in_channels=256,
-        out_channels=64,  # 80
-        image_size=image_size,
-        feature_size=[image_size[0] // 8, image_size[1] // 8],
-        xbound=[0, 51.2, 0.16],
-        ybound=[-25.6, 25.6, 0.16],
-        zbound=[-2.5, 2.5, 5],
-        dbound=[1.0, 60.0, 1.0],
-        downsample=1,
-    ),
-    fusion_layer=dict(type="ConvFuser", in_channels=[64, 64], out_channels=64),
     bbox_head=dict(
         type="Anchor3DHead",
         num_classes=3,
@@ -251,9 +183,8 @@ train_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
-    # dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
+    dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
     dict(
         type="GlobalRotScaleTrans",
         rot_range=[-0.78539816, 0.78539816],
@@ -262,9 +193,7 @@ train_pipeline = [
     dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="PointShuffle"),
-    dict(
-        type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
-    ),
+    dict(type="Pack3DDetInputs", keys=["points", "gt_labels_3d", "gt_bboxes_3d"]),
 ]
 test_pipeline = [
     dict(
@@ -274,7 +203,6 @@ test_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
     dict(
         type="MultiScaleFlipAug3D",
         img_scale=(1333, 800),
@@ -291,9 +219,7 @@ test_pipeline = [
             dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
         ],
     ),
-    dict(
-        type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
-    ),
+    dict(type="Pack3DDetInputs", keys=["points"]),
 ]
 eval_pipeline = [
     dict(
@@ -303,10 +229,7 @@ eval_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
-    dict(
-        type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
-    ),
+    dict(type="Pack3DDetInputs", keys=["points"]),
 ]
 # datasets
 train_dataloader = dict(
@@ -321,7 +244,7 @@ train_dataloader = dict(
             type=dataset_type,
             data_root=data_root,
             ann_file="kitti_infos_train.pkl",
-            data_prefix=dict(pts="training/velodyne", img="training/image_2"),
+            data_prefix=dict(pts="training/velodyne"),
             pipeline=train_pipeline,
             modality=input_modality,
             test_mode=False,
@@ -342,7 +265,7 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        data_prefix=dict(pts="training/velodyne", img="training/image_2"),
+        data_prefix=dict(pts="training/velodyne"),
         ann_file="kitti_infos_val.pkl",
         pipeline=test_pipeline,
         modality=input_modality,
@@ -361,7 +284,7 @@ test_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        data_prefix=dict(pts="training/velodyne", img="training/image_2"),
+        data_prefix=dict(pts="training/velodyne"),
         ann_file="kitti_infos_val.pkl",
         pipeline=test_pipeline,
         modality=input_modality,

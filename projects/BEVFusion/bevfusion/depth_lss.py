@@ -10,10 +10,10 @@ from .ops import bev_pool
 
 def gen_dx_bx(xbound, ybound, zbound):
     dx = torch.Tensor([row[2] for row in [xbound, ybound, zbound]])
-    bx = torch.Tensor(
-        [row[0] + row[2] / 2.0 for row in [xbound, ybound, zbound]])
-    nx = torch.LongTensor([(row[1] - row[0]) / row[2]
-                           for row in [xbound, ybound, zbound]])
+    bx = torch.Tensor([row[0] + row[2] / 2.0 for row in [xbound, ybound, zbound]])
+    nx = torch.LongTensor(
+        [(row[1] - row[0]) / row[2] for row in [xbound, ybound, zbound]]
+    )
     return dx, bx, nx
 
 
@@ -54,16 +54,22 @@ class BaseViewTransform(nn.Module):
         fH, fW = self.feature_size
 
         ds = (
-            torch.arange(*self.dbound,
-                         dtype=torch.float).view(-1, 1, 1).expand(-1, fH, fW))
+            torch.arange(*self.dbound, dtype=torch.float)
+            .view(-1, 1, 1)
+            .expand(-1, fH, fW)
+        )
         D, _, _ = ds.shape
 
         xs = (
-            torch.linspace(0, iW - 1, fW,
-                           dtype=torch.float).view(1, 1, fW).expand(D, fH, fW))
+            torch.linspace(0, iW - 1, fW, dtype=torch.float)
+            .view(1, 1, fW)
+            .expand(D, fH, fW)
+        )
         ys = (
-            torch.linspace(0, iH - 1, fH,
-                           dtype=torch.float).view(1, fH, 1).expand(D, fH, fW))
+            torch.linspace(0, iH - 1, fH, dtype=torch.float)
+            .view(1, fH, 1)
+            .expand(D, fH, fW)
+        )
 
         frustum = torch.stack((xs, ys, ds), -1)
         return nn.Parameter(frustum, requires_grad=False)
@@ -83,8 +89,10 @@ class BaseViewTransform(nn.Module):
         # B x N x D x H x W x 3
         points = self.frustum - post_trans.view(B, N, 1, 1, 1, 3)
         points = (
-            torch.inverse(post_rots).view(B, N, 1, 1, 1, 3,
-                                          3).matmul(points.unsqueeze(-1)))
+            torch.inverse(post_rots)
+            .view(B, N, 1, 1, 1, 3, 3)
+            .matmul(points.unsqueeze(-1))
+        )
         # cam_to_lidar
         points = torch.cat(
             (
@@ -97,16 +105,17 @@ class BaseViewTransform(nn.Module):
         points = combine.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1)
         points += camera2lidar_trans.view(B, N, 1, 1, 1, 3)
 
-        if 'extra_rots' in kwargs:
-            extra_rots = kwargs['extra_rots']
+        if "extra_rots" in kwargs:
+            extra_rots = kwargs["extra_rots"]
             points = (
-                extra_rots.view(B, 1, 1, 1, 1, 3,
-                                3).repeat(1, N, 1, 1, 1, 1, 1).matmul(
-                                    points.unsqueeze(-1)).squeeze(-1))
-        if 'extra_trans' in kwargs:
-            extra_trans = kwargs['extra_trans']
-            points += extra_trans.view(B, 1, 1, 1, 1,
-                                       3).repeat(1, N, 1, 1, 1, 1)
+                extra_rots.view(B, 1, 1, 1, 1, 3, 3)
+                .repeat(1, N, 1, 1, 1, 1, 1)
+                .matmul(points.unsqueeze(-1))
+                .squeeze(-1)
+            )
+        if "extra_trans" in kwargs:
+            extra_trans = kwargs["extra_trans"]
+            points += extra_trans.view(B, 1, 1, 1, 1, 3).repeat(1, N, 1, 1, 1, 1)
 
         return points
 
@@ -121,22 +130,25 @@ class BaseViewTransform(nn.Module):
         x = x.reshape(Nprime, C)
 
         # flatten indices
-        geom_feats = ((geom_feats - (self.bx - self.dx / 2.0)) /
-                      self.dx).long()
+        geom_feats = ((geom_feats - (self.bx - self.dx / 2.0)) / self.dx).long()
         geom_feats = geom_feats.view(Nprime, 3)
-        batch_ix = torch.cat([
-            torch.full([Nprime // B, 1], ix, device=x.device, dtype=torch.long)
-            for ix in range(B)
-        ])
+        batch_ix = torch.cat(
+            [
+                torch.full([Nprime // B, 1], ix, device=x.device, dtype=torch.long)
+                for ix in range(B)
+            ]
+        )
         geom_feats = torch.cat((geom_feats, batch_ix), 1)
 
         # filter out points that are outside box
-        kept = ((geom_feats[:, 0] >= 0)
-                & (geom_feats[:, 0] < self.nx[0])
-                & (geom_feats[:, 1] >= 0)
-                & (geom_feats[:, 1] < self.nx[1])
-                & (geom_feats[:, 2] >= 0)
-                & (geom_feats[:, 2] < self.nx[2]))
+        kept = (
+            (geom_feats[:, 0] >= 0)
+            & (geom_feats[:, 0] < self.nx[0])
+            & (geom_feats[:, 1] >= 0)
+            & (geom_feats[:, 1] < self.nx[1])
+            & (geom_feats[:, 2] >= 0)
+            & (geom_feats[:, 2] < self.nx[2])
+        )
         x = x[kept]
         geom_feats = geom_feats[kept]
 
@@ -212,8 +224,7 @@ class LSSTransform(BaseViewTransform):
         if downsample > 1:
             assert downsample == 2, downsample
             self.downsample = nn.Sequential(
-                nn.Conv2d(
-                    out_channels, out_channels, 3, padding=1, bias=False),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(True),
                 nn.Conv2d(
@@ -226,8 +237,7 @@ class LSSTransform(BaseViewTransform):
                 ),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(True),
-                nn.Conv2d(
-                    out_channels, out_channels, 3, padding=1, bias=False),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(True),
             )
@@ -240,8 +250,8 @@ class LSSTransform(BaseViewTransform):
         x = x.view(B * N, C, fH, fW)
 
         x = self.depthnet(x)
-        depth = x[:, :self.D].softmax(dim=1)
-        x = depth.unsqueeze(1) * x[:, self.D:(self.D + self.C)].unsqueeze(2)
+        depth = x[:, : self.D].softmax(dim=1)
+        x = depth.unsqueeze(1) * x[:, self.D : (self.D + self.C)].unsqueeze(2)
 
         x = x.view(B, N, self.C, self.D, fH, fW)
         x = x.permute(0, 1, 3, 4, 5, 2)
@@ -274,8 +284,9 @@ class BaseDepthTransform(BaseViewTransform):
         camera2lidar_trans = camera2lidar[..., :3, 3]
 
         batch_size = len(points)
-        depth = torch.zeros(batch_size, img.shape[1], 1,
-                            *self.image_size).to(points[0].device)
+        depth = torch.zeros(batch_size, img.shape[1], 1, *self.image_size).to(
+            points[0].device
+        )
 
         for b in range(batch_size):
             cur_coords = points[b][:, :3]
@@ -286,7 +297,8 @@ class BaseDepthTransform(BaseViewTransform):
             # inverse aug
             cur_coords -= cur_lidar_aug_matrix[:3, 3]
             cur_coords = torch.inverse(cur_lidar_aug_matrix[:3, :3]).matmul(
-                cur_coords.transpose(1, 0))
+                cur_coords.transpose(1, 0)
+            )
             # lidar2image
             cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords)
             cur_coords += cur_lidar2image[:, :3, 3].reshape(-1, 3, 1)
@@ -296,6 +308,7 @@ class BaseDepthTransform(BaseViewTransform):
             cur_coords[:, :2, :] /= cur_coords[:, 2:3, :]
 
             # imgaug
+            cur_img_aug_matrix = cur_img_aug_matrix.unsqueeze(0).contiguous()
             cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords)
             cur_coords += cur_img_aug_matrix[:, :3, 3].reshape(-1, 3, 1)
             cur_coords = cur_coords[:, :2, :].transpose(1, 2)
@@ -303,16 +316,17 @@ class BaseDepthTransform(BaseViewTransform):
             # normalize coords for grid sample
             cur_coords = cur_coords[..., [1, 0]]
 
-            on_img = ((cur_coords[..., 0] < self.image_size[0])
-                      & (cur_coords[..., 0] >= 0)
-                      & (cur_coords[..., 1] < self.image_size[1])
-                      & (cur_coords[..., 1] >= 0))
+            on_img = (
+                (cur_coords[..., 0] < self.image_size[0])
+                & (cur_coords[..., 0] >= 0)
+                & (cur_coords[..., 1] < self.image_size[1])
+                & (cur_coords[..., 1] >= 0)
+            )
             for c in range(on_img.shape[0]):
                 masked_coords = cur_coords[c, on_img[c]].long()
                 masked_dist = dist[c, on_img[c]]
                 depth = depth.to(masked_dist.dtype)
-                depth[b, c, 0, masked_coords[:, 0],
-                      masked_coords[:, 1]] = masked_dist
+                depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist
 
         extra_rots = lidar_aug_matrix[..., :3, :3]
         extra_trans = lidar_aug_matrix[..., :3, 3]
@@ -381,8 +395,7 @@ class DepthLSSTransform(BaseDepthTransform):
         if downsample > 1:
             assert downsample == 2, downsample
             self.downsample = nn.Sequential(
-                nn.Conv2d(
-                    out_channels, out_channels, 3, padding=1, bias=False),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(True),
                 nn.Conv2d(
@@ -395,8 +408,7 @@ class DepthLSSTransform(BaseDepthTransform):
                 ),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(True),
-                nn.Conv2d(
-                    out_channels, out_channels, 3, padding=1, bias=False),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(True),
             )
@@ -409,12 +421,14 @@ class DepthLSSTransform(BaseDepthTransform):
         d = d.view(B * N, *d.shape[2:])
         x = x.view(B * N, C, fH, fW)
 
+        # print(d.shape, x.shape)
         d = self.dtransform(d)
+        # print(d.shape, x.shape)
         x = torch.cat([d, x], dim=1)
         x = self.depthnet(x)
 
-        depth = x[:, :self.D].softmax(dim=1)
-        x = depth.unsqueeze(1) * x[:, self.D:(self.D + self.C)].unsqueeze(2)
+        depth = x[:, : self.D].softmax(dim=1)
+        x = depth.unsqueeze(1) * x[:, self.D : (self.D + self.C)].unsqueeze(2)
 
         x = x.view(B, N, self.C, self.D, fH, fW)
         x = x.permute(0, 1, 3, 4, 5, 2)
