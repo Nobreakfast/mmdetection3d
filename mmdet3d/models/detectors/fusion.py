@@ -1,15 +1,18 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from copy import deepcopy
 from typing import Dict, List, Tuple, Union
+from collections import OrderedDict
 
 import torch
 from torch import Tensor
 from torch.nn import functional as F
+import torch.distributed as dist
 
 import numpy as np
 
 from mmdet3d.registry import MODELS
 from mmdet3d.utils import ConfigType, OptConfigType, OptMultiConfig
+from mmengine.utils import is_list_of
 from ...structures.det3d_data_sample import OptSampleList, SampleList
 from .base import Base3DDetector
 
@@ -78,6 +81,44 @@ class FusionDetector(Base3DDetector):
         self.bbox_head = MODELS.build(bbox_head)
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
+        self.init_weights()
+
+    def parse_losses(
+        self, losses: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """Parses the raw outputs (losses) of the network.
+
+        Args:
+            losses (dict): Raw output of the network, which usually contain
+                losses and other necessary information.
+
+        Returns:
+            tuple[Tensor, dict]: There are two elements. The first is the
+            loss tensor passed to optim_wrapper which may be a weighted sum
+            of all losses, and the second is log_vars which will be sent to
+            the logger.
+        """
+        log_vars = []
+        for loss_name, loss_value in losses.items():
+            if isinstance(loss_value, torch.Tensor):
+                log_vars.append([loss_name, loss_value.mean()])
+            elif is_list_of(loss_value, torch.Tensor):
+                log_vars.append([loss_name, sum(_loss.mean() for _loss in loss_value)])
+            else:
+                raise TypeError(f"{loss_name} is not a tensor or list of tensors")
+
+        loss = sum(value for key, value in log_vars if "loss" in key)
+        log_vars.insert(0, ["loss", loss])
+        log_vars = OrderedDict(log_vars)  # type: ignore
+
+        for loss_name, loss_value in log_vars.items():
+            # reduce loss when distributed training
+            if dist.is_available() and dist.is_initialized():
+                loss_value = loss_value.data.clone()
+                dist.all_reduce(loss_value.div_(dist.get_world_size()))
+            log_vars[loss_name] = loss_value.item()
+
+        return loss, log_vars  # type: ignore
 
     def loss(
         self, batch_inputs_dict: dict, batch_data_samples: SampleList, **kwargs
@@ -99,7 +140,9 @@ class FusionDetector(Base3DDetector):
             dict: A dictionary of loss components.
         """
         x = self.extract_feat(batch_inputs_dict, batch_data_samples)
-        losses = self.bbox_head.loss(x, batch_data_samples, **kwargs)
+        losses = dict()
+        bbox_loss = self.bbox_head.loss(x, batch_data_samples, **kwargs)
+        losses.update(bbox_loss)
         return losses
 
     def predict(
@@ -163,6 +206,10 @@ class FusionDetector(Base3DDetector):
         results = self.bbox_head.forward(x)
         return results
 
+    def init_weights(self) -> None:
+        if self.img_backbone is not None:
+            self.img_backbone.init_weights()
+
     def extract_feat(
         self, batch_inputs_dict: Dict[str, Tensor], data_samples: Dict[str, Tensor]
     ) -> Union[Tuple[torch.Tensor], Dict[str, Tensor]]:
@@ -181,16 +228,10 @@ class FusionDetector(Base3DDetector):
                 lidar_aug_matrix.append(np.eye(4))
 
             lidar2img = imgs.new_tensor(np.asarray(lidar2img))
-            lidar2img = F.pad(lidar2img, (0, 1), "constant", 0)
-            lidar2img[:, 2, 3] = 1
             lidar2img = lidar2img.unsqueeze(1).contiguous()
             cam2img = imgs.new_tensor(np.asarray(cam2img))
-            cam2img = F.pad(cam2img, (0, 1), "constant", 0)
-            cam2img[:, 2, 3] = 1
             cam2img = cam2img.unsqueeze(1).contiguous()
             cam2lidar = imgs.new_tensor(np.asarray(cam2lidar))
-            cam2lidar = F.pad(cam2lidar, (0, 1), "constant", 0)
-            cam2lidar[:, 2, 3] = 1
             cam2lidar = cam2lidar.unsqueeze(1).contiguous()
             img_aug_matrix = imgs.new_tensor(np.asarray(img_aug_matrix))
             lidar_aug_matrix = imgs.new_tensor(np.asarray(lidar_aug_matrix))

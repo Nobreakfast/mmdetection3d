@@ -6,8 +6,8 @@ model = dict(
     type='ImVoxelNet',
     data_preprocessor=dict(
         type='Det3DDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
         bgr_to_rgb=True,
         pad_size_divisor=32),
     backbone=dict(
@@ -34,8 +34,16 @@ model = dict(
         use_direction_classifier=True,
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
-            ranges=[[-0.16, -39.68, -1.78, 68.96, 39.68, -1.78]],
-            sizes=[[3.9, 1.6, 1.56]],
+            ranges=[
+                # [-0.16, -39.68, -1.78, 68.96, 39.68, -1.78],
+                # [-0.16, -39.68, -1.78, 68.96, 39.68, -1.78],
+                [-0.16, -39.68, -1.78, 68.96, 39.68, -1.78]
+                ],
+            sizes=[
+                # [0.8, 0.6, 1.73],
+                # [1.76, 0.6, 1.73],
+                [3.9, 1.6, 1.56]
+                ],
             rotations=[0, 1.57],
             reshape_out=True),
         diff_rad_by_sin=True,
@@ -59,12 +67,30 @@ model = dict(
         rotations=[.0]),
     train_cfg=dict(
         assigner=dict(
-            type='Max3DIoUAssigner',
-            iou_calculator=dict(type='mmdet3d.BboxOverlapsNearest3D'),
-            pos_iou_thr=0.6,
-            neg_iou_thr=0.45,
-            min_pos_iou=0.45,
-            ignore_iof_thr=-1),
+                type='Max3DIoUAssigner',
+                iou_calculator=dict(type='mmdet3d.BboxOverlapsNearest3D'),
+                pos_iou_thr=0.6,
+                neg_iou_thr=0.45,
+                min_pos_iou=0.45,
+                ignore_iof_thr=-1),
+            # dict(  # for Pedestrian
+            #     type="Max3DIoUAssigner",
+            #     iou_calculator=dict(type="mmdet3d.BboxOverlapsNearest3D"),
+            #     pos_iou_thr=0.5,
+            #     neg_iou_thr=0.35,
+            #     min_pos_iou=0.35,
+            #     ignore_iof_thr=-1,
+            # ),
+            # dict(  # for Cyclist
+            #     type="Max3DIoUAssigner",
+            #     iou_calculator=dict(type="mmdet3d.BboxOverlapsNearest3D"),
+            #     pos_iou_thr=0.5,
+            #     neg_iou_thr=0.35,
+            #     min_pos_iou=0.35,
+            #     ignore_iof_thr=-1,
+            # ),
+            
+        
         allowed_border=0,
         pos_weight=-1,
         debug=False),
@@ -78,8 +104,12 @@ model = dict(
         max_num=50))
 
 dataset_type = 'KittiDataset'
-data_root = 'data/kitti/'
-class_names = ['Car']
+data_root = 'data/vod5f/'
+class_names = [
+    "Pedestrian",
+    "Cyclist",
+    "Car",
+]
 input_modality = dict(use_lidar=False, use_camera=True)
 point_cloud_range = [0, -39.68, -3, 69.12, 39.68, 1]
 metainfo = dict(classes=class_names)
