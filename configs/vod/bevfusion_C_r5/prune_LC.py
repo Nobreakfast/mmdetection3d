@@ -38,8 +38,8 @@ optim_type = "AdamW"
 dataset_type = "KittiDataset"
 input_modality = dict(use_lidar=True, use_camera=True)
 class_names = [
-    "Pedestrian",
-    "Cyclist",
+    # "Pedestrian",
+    # "Cyclist",
     "Car",
 ]
 metainfo = dict(classes=class_names)
@@ -82,7 +82,7 @@ checkpoint_num = 1
 # model
 model = dict(
     type="FusionDetector",
-    modality=dict(use_lidar=False, use_camera=True),
+    modality=dict(use_lidar=True, use_camera=True),
     data_preprocessor=dict(
         type="Det3DDataPreprocessor",
         voxel=True,
@@ -191,10 +191,10 @@ model = dict(
         dbound=[1.0, 60, 1.0],
         downsample=1,
     ),
-    # fusion_layer=dict(type="ConvFuser", in_channels=[64, 64], out_channels=64),
+    fusion_layer=dict(type="ConvFuser", in_channels=[128, 64], out_channels=128),
     bbox_head=dict(
         type="Anchor3DHead",
-        num_classes=3,  # 3
+        num_classes=1,  # 3
         in_channels=384,  # 384
         feat_channels=384,
         use_direction_classifier=True,

@@ -59,8 +59,8 @@ anchor_sizes = [
 ]
 
 # training settings
-lr = 0.001
-epoch_num = 80
+lr = 0.0001
+epoch_num = 24
 
 # log settings
 log_level = "INFO"
@@ -251,17 +251,18 @@ train_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    # dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    dict(type="LoadImageFromFileMono3D", to_float32=True, backend_args=backend_args),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
     # dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
-    dict(
-        type="GlobalRotScaleTrans",
-        rot_range=[-0.78539816, 0.78539816],
-        scale_ratio_range=[0.95, 1.05],
-    ),
-    dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    # dict(
+    #     type="GlobalRotScaleTrans",
+    #     rot_range=[-0.78539816, 0.78539816],
+    #     scale_ratio_range=[0.95, 1.05],
+    # ),
+    # dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
-    dict(type="PointShuffle"),
+    # dict(type="PointShuffle"),
     dict(
         type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
     ),
@@ -274,23 +275,24 @@ test_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
-    dict(
-        type="MultiScaleFlipAug3D",
-        img_scale=(1333, 800),
-        pts_scale_ratio=1,
-        flip=False,
-        transforms=[
-            dict(
-                type="GlobalRotScaleTrans",
-                rot_range=[0, 0],
-                scale_ratio_range=[1.0, 1.0],
-                translation_std=[0, 0, 0],
-            ),
-            dict(type="RandomFlip3D"),
-            dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
-        ],
-    ),
+    # dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    dict(type="LoadImageFromFileMono3D", to_float32=True, backend_args=backend_args),
+    # dict(
+    #     type="MultiScaleFlipAug3D",
+    #     img_scale=(1333, 800),
+    #     pts_scale_ratio=1,
+    #     flip=False,
+    #     transforms=[
+    #         dict(
+    #             type="GlobalRotScaleTrans",
+    #             rot_range=[0, 0],
+    #             scale_ratio_range=[1.0, 1.0],
+    #             translation_std=[0, 0, 0],
+    #         ),
+    #         dict(type="RandomFlip3D"),
+    #         dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    #     ],
+    # ),
     dict(
         type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
     ),
@@ -303,7 +305,8 @@ eval_pipeline = [
         use_dim=7,
         backend_args=backend_args,
     ),
-    dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    # dict(type="LoadImageFromFile", to_float32=True, backend_args=backend_args),
+    dict(type="LoadImageFromFileMono3D", to_float32=True, backend_args=backend_args),
     dict(
         type="Pack3DDetInputs", keys=["points", "img", "gt_labels_3d", "gt_bboxes_3d"]
     ),
@@ -387,49 +390,66 @@ test_evaluator = dict(
     submission_prefix=submission_prefix,
     pklfile_prefix=pklfile_prefix,
 )
-# optimizer
 optim_wrapper = dict(
     type="OptimWrapper",
-    optimizer=dict(type=optim_type, lr=lr, betas=(0.95, 0.99), weight_decay=0.01),
-    clip_grad=dict(max_norm=35, norm_type=2),
+    optimizer=dict(type="AdamW", lr=lr, betas=(0.95, 0.99), weight_decay=1e-4),
+    paramwise_cfg=dict(custom_keys={"img_backbone": dict(lr_mult=0.1, decay_mult=1.0)}),
+    clip_grad=dict(max_norm=5, norm_type=2),
 )
 param_scheduler = [
+    # dict(type="LinearLR", start_factor=0.1, by_epoch=False, begin=0, end=1000),
     dict(
         type="CosineAnnealingLR",
-        T_max=epoch_num * 0.4,
-        eta_min=lr * 10,
         begin=0,
-        end=epoch_num * 0.4,
+        T_max=24,
+        end=24,
         by_epoch=True,
-        convert_to_iter_based=True,
-    ),
-    dict(
-        type="CosineAnnealingLR",
-        T_max=epoch_num * 0.6,
-        eta_min=lr * 1e-4,
-        begin=epoch_num * 0.4,
-        end=epoch_num * 1,
-        by_epoch=True,
-        convert_to_iter_based=True,
-    ),
-    dict(
-        type="CosineAnnealingMomentum",
-        T_max=epoch_num * 0.4,
-        eta_min=0.85 / 0.95,
-        begin=0,
-        end=epoch_num * 0.4,
-        by_epoch=True,
-        convert_to_iter_based=True,
-    ),
-    dict(
-        type="CosineAnnealingMomentum",
-        T_max=epoch_num * 0.6,
-        eta_min=1,
-        begin=epoch_num * 0.4,
-        end=epoch_num * 1,
-        convert_to_iter_based=True,
+        eta_min=lr / 10,
     ),
 ]
+# optimizer
+# optim_wrapper = dict(
+#     type="OptimWrapper",
+#     optimizer=dict(type=optim_type, lr=lr, betas=(0.95, 0.99), weight_decay=0.01),
+#     clip_grad=dict(max_norm=35, norm_type=2),
+# )
+# param_scheduler = [
+#     dict(
+#         type="CosineAnnealingLR",
+#         T_max=epoch_num * 0.4,
+#         eta_min=lr * 10,
+#         begin=0,
+#         end=epoch_num * 0.4,
+#         by_epoch=True,
+#         convert_to_iter_based=True,
+#     ),
+#     dict(
+#         type="CosineAnnealingLR",
+#         T_max=epoch_num * 0.6,
+#         eta_min=lr * 1e-4,
+#         begin=epoch_num * 0.4,
+#         end=epoch_num * 1,
+#         by_epoch=True,
+#         convert_to_iter_based=True,
+#     ),
+#     dict(
+#         type="CosineAnnealingMomentum",
+#         T_max=epoch_num * 0.4,
+#         eta_min=0.85 / 0.95,
+#         begin=0,
+#         end=epoch_num * 0.4,
+#         by_epoch=True,
+#         convert_to_iter_based=True,
+#     ),
+#     dict(
+#         type="CosineAnnealingMomentum",
+#         T_max=epoch_num * 0.6,
+#         eta_min=1,
+#         begin=epoch_num * 0.4,
+#         end=epoch_num * 1,
+#         convert_to_iter_based=True,
+#     ),
+# ]
 auto_scale_lr = dict(enable=False, base_batch_size=48)
 
 train_cfg = dict(by_epoch=True, max_epochs=epoch_num, val_interval=1)

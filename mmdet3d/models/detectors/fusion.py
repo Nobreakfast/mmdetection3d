@@ -16,6 +16,8 @@ from mmengine.utils import is_list_of
 from ...structures.det3d_data_sample import OptSampleList, SampleList
 from .base import Base3DDetector
 
+import matplotlib.pyplot as plt
+
 
 @MODELS.register_module()
 class FusionDetector(Base3DDetector):
@@ -73,6 +75,10 @@ class FusionDetector(Base3DDetector):
             self.view_transform = (
                 MODELS.build(view_transform) if view_transform else None
             )
+        else:
+            self.img_backbone = None
+            self.img_neck = None
+            self.view_transform = None
         self.fusion_layer = MODELS.build(fusion_layer) if fusion_layer else None
         self.pts_backbone = MODELS.build(pts_backbone) if pts_backbone else None
         self.pts_neck = MODELS.build(pts_neck) if pts_neck else None
@@ -82,6 +88,49 @@ class FusionDetector(Base3DDetector):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         self.init_weights()
+        self.cam2img = np.asarray(
+            [
+                1495.468642,
+                0.0,
+                961.272442,
+                0.0,
+                0.0,
+                1495.468642,
+                624.89592,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+            ]
+        ).reshape(4, 4)
+        self.lidar2cam = np.asarray(
+            [
+                # -0.013857 -0.9997468 0.01772762 0.05283124 0.10934269 -0.01913807 -0.99381983 0.98100483 0.99390751 -0.01183297 0.1095802 1.44445002
+                -0.013857,
+                -0.9997468,
+                0.01772762,
+                0.05283124,
+                0.10934269,
+                -0.01913807,
+                -0.99381983,
+                0.98100483,
+                0.99390751,
+                -0.01183297,
+                0.1095802,
+                1.44445002,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+            ]
+        ).reshape(4, 4)
+        self.lidar2img = self.cam2img @ self.lidar2cam
+        self.cam2lidar = np.linalg.inv(self.lidar2cam)
 
     def parse_losses(
         self, losses: Dict[str, torch.Tensor]
@@ -222,8 +271,10 @@ class FusionDetector(Base3DDetector):
             img_aug_matrix, lidar_aug_matrix = [], []
             for data_sample in data_samples:
                 lidar2img.append(data_sample.lidar2img)
+                # lidar2img.append(self.lidar2img)
                 cam2img.append(data_sample.cam2img)
                 cam2lidar.append(np.linalg.inv(data_sample.lidar2cam))
+                # cam2lidar.append(self.cam2lidar)
                 img_aug_matrix.append(np.eye(4))
                 lidar_aug_matrix.append(np.eye(4))
 
@@ -235,7 +286,6 @@ class FusionDetector(Base3DDetector):
             cam2lidar = cam2lidar.unsqueeze(1).contiguous()
             img_aug_matrix = imgs.new_tensor(np.asarray(img_aug_matrix))
             lidar_aug_matrix = imgs.new_tensor(np.asarray(lidar_aug_matrix))
-
             img_feat = self.extract_img_feat(
                 imgs,
                 deepcopy(points),
@@ -246,11 +296,31 @@ class FusionDetector(Base3DDetector):
                 lidar_aug_matrix,
                 None,
             )
+            img_feat = img_feat.transpose(-1, -2)
             features.append(img_feat)
         # if points is not None:
         if self.modality["use_lidar"]:
             pts_feature = self.extract_pts_feat(batch_inputs_dict)
             features.append(pts_feature)
+        #import os
+
+        #os.makedirs("/home/allen/Downloads/vis/", exist_ok=True)
+        #plt.figure()
+        #img_viz = imgs[0][0].detach().cpu().numpy().transpose(1, 2, 0)
+        #plt.imshow(img_viz / 255)
+        #plt.savefig("/home/allen/Downloads/vis/img.png")
+        #plt.close()
+
+        #plt.figure()
+        #plt.imshow(features[0][0].sum(0).detach().cpu().numpy())
+        #plt.savefig("/home/allen/Downloads/vis/img_feat.png")
+        #plt.close()
+
+        #plt.figure()
+        #plt.imshow(features[1][0].sum(0).detach().cpu().numpy())
+        #plt.savefig("/home/allen/Downloads/vis/pts_feat.png")
+        #plt.close()
+        #print(heel)
 
         if self.fusion_layer is not None:
             x = self.fusion_layer(features)

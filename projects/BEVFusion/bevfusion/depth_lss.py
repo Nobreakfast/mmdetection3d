@@ -9,10 +9,16 @@ from .ops import bev_pool
 
 
 def gen_dx_bx(xbound, ybound, zbound):
-    dx = torch.Tensor([row[2] for row in [xbound, ybound, zbound]])
-    bx = torch.Tensor([row[0] + row[2] / 2.0 for row in [xbound, ybound, zbound]])
+    dx = torch.Tensor(
+        [row[2] for row in [xbound, ybound, zbound]]
+    )  # bound[2] is the step size
+    bx = torch.Tensor(
+        [row[0] + row[2] / 2.0 for row in [xbound, ybound, zbound]]
+    )  # bx is the offset
     nx = torch.LongTensor(
-        [(row[1] - row[0]) / row[2] for row in [xbound, ybound, zbound]]
+        [
+            (row[1] - row[0]) / row[2] for row in [xbound, ybound, zbound]
+        ]  # nx is the number of steps
     )
     return dx, bx, nx
 
@@ -117,7 +123,7 @@ class BaseViewTransform(nn.Module):
             extra_trans = kwargs["extra_trans"]
             points += extra_trans.view(B, 1, 1, 1, 1, 3).repeat(1, N, 1, 1, 1, 1)
 
-        return points
+        return points  # fake points in lidar coordinate
 
     def get_cam_feats(self, x):
         raise NotImplementedError
@@ -130,7 +136,9 @@ class BaseViewTransform(nn.Module):
         x = x.reshape(Nprime, C)
 
         # flatten indices
-        geom_feats = ((geom_feats - (self.bx - self.dx / 2.0)) / self.dx).long()
+        geom_feats = (
+            (geom_feats - (self.bx - self.dx / 2.0)) / self.dx
+        ).long()  # 根据网格取整
         geom_feats = geom_feats.view(Nprime, 3)
         batch_ix = torch.cat(
             [
@@ -142,12 +150,12 @@ class BaseViewTransform(nn.Module):
 
         # filter out points that are outside box
         kept = (
-            (geom_feats[:, 0] >= 0)
-            & (geom_feats[:, 0] < self.nx[0])
-            & (geom_feats[:, 1] >= 0)
-            & (geom_feats[:, 1] < self.nx[1])
-            & (geom_feats[:, 2] >= 0)
-            & (geom_feats[:, 2] < self.nx[2])
+            (geom_feats[:, 0] >= 0)  # x > 0
+            & (geom_feats[:, 0] < self.nx[0])  # x < grid size
+            & (geom_feats[:, 1] >= 0)  # y > 0
+            & (geom_feats[:, 1] < self.nx[1])  # y < grid size
+            & (geom_feats[:, 2] >= 0)  # z > 0
+            & (geom_feats[:, 2] < self.nx[2])  # z < grid size
         )
         x = x[kept]
         geom_feats = geom_feats[kept]
