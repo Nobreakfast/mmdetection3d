@@ -4,9 +4,9 @@ global settings
 
 default_scope = "mmdet3d"
 backend_args = None
-custom_imports = dict(
-    imports=["projects.BEVFusion.bevfusion"], allow_failed_imports=False
-)
+# custom_imports = dict(
+#     imports=["projects.BEVFusion.bevfusion"], allow_failed_imports=False
+# )
 
 # prune settings
 p_pruner = "OneShot"
