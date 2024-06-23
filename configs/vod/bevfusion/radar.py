@@ -356,7 +356,7 @@ param_scheduler = [
         eta_min=lr / 10,
     ),
 ]
-auto_scale_lr = dict(enable=True, base_batch_size=2)
+auto_scale_lr = dict(enable=True, base_batch_size=8)
 
 train_cfg = dict(by_epoch=True, max_epochs=epoch_num, val_interval=1)
 val_cfg = dict()
