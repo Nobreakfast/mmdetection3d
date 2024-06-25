@@ -302,25 +302,25 @@ class FusionDetector(Base3DDetector):
         if self.modality["use_lidar"]:
             pts_feature = self.extract_pts_feat(batch_inputs_dict)
             features.append(pts_feature)
-        #import os
+        # import os
 
-        #os.makedirs("/home/allen/Downloads/vis/", exist_ok=True)
-        #plt.figure()
-        #img_viz = imgs[0][0].detach().cpu().numpy().transpose(1, 2, 0)
-        #plt.imshow(img_viz / 255)
-        #plt.savefig("/home/allen/Downloads/vis/img.png")
-        #plt.close()
+        # os.makedirs("/home/allen/Downloads/vis/", exist_ok=True)
+        # plt.figure()
+        # img_viz = imgs[0][0].detach().cpu().numpy().transpose(1, 2, 0)
+        # plt.imshow(img_viz / 255)
+        # plt.savefig("/home/allen/Downloads/vis/img.png")
+        # plt.close()
 
-        #plt.figure()
-        #plt.imshow(features[0][0].sum(0).detach().cpu().numpy())
-        #plt.savefig("/home/allen/Downloads/vis/img_feat.png")
-        #plt.close()
+        # plt.figure()
+        # plt.imshow(features[0][0].sum(0).detach().cpu().numpy())
+        # plt.savefig("/home/allen/Downloads/vis/img_feat.png")
+        # plt.close()
 
-        #plt.figure()
-        #plt.imshow(features[1][0].sum(0).detach().cpu().numpy())
-        #plt.savefig("/home/allen/Downloads/vis/pts_feat.png")
-        #plt.close()
-        #print(heel)
+        # plt.figure()
+        # plt.imshow(features[1][0].sum(0).detach().cpu().numpy())
+        # plt.savefig("/home/allen/Downloads/vis/pts_feat.png")
+        # plt.close()
+        # print(heel)
 
         if self.fusion_layer is not None:
             x = self.fusion_layer(features)
@@ -340,6 +340,78 @@ class FusionDetector(Base3DDetector):
         batch_size = voxel_dict["coors"][-1, 0].item() + 1
         x = self.pts_middle_encoder(voxel_features, voxel_dict["coors"], batch_size)
         return x
+
+    def extract_img_feat(
+        self,
+        x,
+        points,
+        lidar2image,
+        camera_intrinsics,
+        camera2lidar,
+        img_aug_matrix,
+        lidar_aug_matrix,
+        img_metas,
+    ) -> torch.Tensor:
+        B, N, C, H, W = x.size()
+        x = x.view(B * N, C, H, W).contiguous()
+
+        x = self.img_backbone(x)
+        x = self.img_neck(x)
+
+        if not isinstance(x, torch.Tensor):
+            x = x[0]
+
+        BN, C, H, W = x.size()
+        x = x.view(B, int(BN / B), C, H, W)
+
+        with torch.autocast(device_type="cuda", dtype=torch.float32):
+            x = self.view_transform(
+                x,
+                points,
+                lidar2image,
+                camera_intrinsics,
+                camera2lidar,
+                img_aug_matrix,
+                lidar_aug_matrix,
+                img_metas,
+            )
+        return x
+
+
+class UniPFusion(FusionDetector):
+    def __init__(
+        self,
+        pts_voxel_encoder: OptConfigType = None,
+        pts_middle_encoder: OptConfigType = None,
+        img_backbone: OptConfigType = None,
+        img_neck: OptConfigType = None,
+        pts_backbone: OptConfigType = None,
+        fusion_layer: OptConfigType = None,
+        view_transform: OptConfigType = None,
+        pts_neck: OptConfigType = None,
+        bbox_head: OptConfigType = None,
+        train_cfg: OptConfigType = None,
+        test_cfg: OptConfigType = None,
+        data_preprocessor: OptConfigType = None,
+        init_cfg: OptMultiConfig = None,
+        modality: OptConfigType = None,
+    ) -> None:
+        super().__init__(
+            pts_voxel_encoder=pts_voxel_encoder,
+            pts_middle_encoder=pts_middle_encoder,
+            img_backbone=img_backbone,
+            img_neck=img_neck,
+            pts_backbone=pts_backbone,
+            fusion_layer=fusion_layer,
+            view_transform=view_transform,
+            pts_neck=pts_neck,
+            bbox_head=bbox_head,
+            train_cfg=train_cfg,
+            test_cfg=test_cfg,
+            data_preprocessor=data_preprocessor,
+            init_cfg=init_cfg,
+            modality=modality,
+        )
 
     def extract_img_feat(
         self,
