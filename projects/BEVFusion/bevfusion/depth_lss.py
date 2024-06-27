@@ -316,7 +316,13 @@ class BaseDepthTransform(BaseViewTransform):
             cur_coords[:, :2, :] /= cur_coords[:, 2:3, :]
 
             # imgaug
-            cur_img_aug_matrix = cur_img_aug_matrix.unsqueeze(0).contiguous()
+            # try:
+            #     cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords)
+            # except:
+            #     cur_img_aug_matrix = cur_img_aug_matrix.unsqueeze(0).contiguous()
+            #     cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords)
+            if len(cur_img_aug_matrix.shape) == 4:
+                cur_img_aug_matrix = cur_img_aug_matrix.unsqueeze(0).contiguous()
             cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords)
             cur_coords += cur_img_aug_matrix[:, :3, 3].reshape(-1, 3, 1)
             cur_coords = cur_coords[:, :2, :].transpose(1, 2)

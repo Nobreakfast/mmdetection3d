@@ -378,6 +378,7 @@ class FusionDetector(Base3DDetector):
         return x
 
 
+@MODELS.register_module()
 class UniPFusion(FusionDetector):
     def __init__(
         self,
@@ -413,38 +414,55 @@ class UniPFusion(FusionDetector):
             modality=modality,
         )
 
-    def extract_img_feat(
-        self,
-        x,
-        points,
-        lidar2image,
-        camera_intrinsics,
-        camera2lidar,
-        img_aug_matrix,
-        lidar_aug_matrix,
-        img_metas,
-    ) -> torch.Tensor:
-        B, N, C, H, W = x.size()
-        x = x.view(B * N, C, H, W).contiguous()
+    def extract_feat(
+        self, batch_inputs_dict: Dict[str, Tensor], data_samples: Dict[str, Tensor]
+    ) -> Union[Tuple[torch.Tensor], Dict[str, Tensor]]:
+        imgs = batch_inputs_dict["imgs"] if self.modality["use_camera"] else None
+        points = batch_inputs_dict["points"]
+        features = []
+        if imgs is not None:
+            # imgs = imgs.unsqueeze(1).contiguous()
+            lidar2img, cam2img, cam2lidar = [], [], []
+            img_aug_matrix, lidar_aug_matrix = [], []
+            for data_sample in data_samples:
+                lidar2img.append(data_sample.lidar2img)
+                cam2img.append(data_sample.cam2img)
+                cam2lidar.append(np.linalg.inv(data_sample.lidar2cam))
+                img_aug_matrix.append(data_sample.get("img_aug_matrix", np.eye(4)))
+                lidar_aug_matrix.append(data_sample.get("lidar_aug_matrix", np.eye(4)))
 
-        x = self.img_backbone(x)
-        x = self.img_neck(x)
-
-        if not isinstance(x, torch.Tensor):
-            x = x[0]
-
-        BN, C, H, W = x.size()
-        x = x.view(B, int(BN / B), C, H, W)
-
-        with torch.autocast(device_type="cuda", dtype=torch.float32):
-            x = self.view_transform(
-                x,
-                points,
-                lidar2image,
-                camera_intrinsics,
-                camera2lidar,
+            lidar2img = imgs.new_tensor(np.asarray(lidar2img))
+            lidar2img = lidar2img.unsqueeze(1).contiguous()
+            cam2img = imgs.new_tensor(np.asarray(cam2img))
+            cam2img = cam2img.unsqueeze(1).contiguous()
+            cam2lidar = imgs.new_tensor(np.asarray(cam2lidar))
+            cam2lidar = cam2lidar.unsqueeze(1).contiguous()
+            img_aug_matrix = imgs.new_tensor(np.asarray(img_aug_matrix))
+            # img_aug_matrix = img_aug_matrix.unsqueeze(1).contiguous()
+            lidar_aug_matrix = imgs.new_tensor(np.asarray(lidar_aug_matrix))
+            # lidar_aug_matrix = lidar_aug_matrix.unsqueeze(1).contiguous()
+            img_feat = self.extract_img_feat(
+                imgs,
+                deepcopy(points),
+                lidar2img,
+                cam2img,
+                cam2lidar,
                 img_aug_matrix,
                 lidar_aug_matrix,
-                img_metas,
+                None,
             )
+            img_feat = img_feat.transpose(-1, -2)
+            features.append(img_feat)
+        if self.modality["use_lidar"]:
+            pts_feature = self.extract_pts_feat(batch_inputs_dict)
+            features.append(pts_feature)
+
+        if self.fusion_layer is not None:
+            x = self.fusion_layer(features)
+        else:
+            # assert len(features) == 1, features
+            x = features[0]
+
+        x = self.pts_backbone(x)
+        x = self.pts_neck(x)
         return x

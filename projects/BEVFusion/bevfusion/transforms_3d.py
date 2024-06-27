@@ -82,6 +82,8 @@ class ImageAug3D(BaseTransform):
         imgs = data['img']
         new_imgs = []
         transforms = []
+        if isinstance(imgs, np.ndarray):
+            imgs = [imgs]
         for img in imgs:
             resize, resize_dims, crop, flip, rotate = self.sample_augmentation(
                 data)
