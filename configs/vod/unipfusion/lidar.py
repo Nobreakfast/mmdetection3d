@@ -26,7 +26,7 @@ p_num_gt_instance = 2
 p_points_feat_dim = 7
 
 # Important settings
-batch_size = 8
+batch_size = 2
 num_workers = 4
 data_root = "data/vod/"
 work_dir = "work_dirs/unipfusion_lidar/train/"
